@@ -13,12 +13,25 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { ZodError } from "zod";
 import { toast } from "sonner";
 
 export default function page() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const isSeller = searchParams.get("as") === "seller";
+  const origin = searchParams.get("origin");
+
+  const continueAsSeller = () => {
+    router.push("?as=seller");
+  };
+
+  const continueAsBuyer = () => {
+    router.replace("/sign-in", undefined);
+  };
+
   const {
     register,
     handleSubmit,
@@ -26,27 +39,28 @@ export default function page() {
   } = useForm<TAuthCredentialsValidator>({
     resolver: zodResolver(AuthCredentialsValidator),
   });
+  const { mutate, isLoading } = trpc.auth.signIn.useMutation({
+    onSuccess: async () => {
+      toast.success("Signed in successfully");
 
-  const router = useRouter();
-  const { mutate, isLoading } = trpc.auth.createPayloadUser.useMutation({
-    onError: (err) => {
-      if (err.data?.code === "CONFLICT") {
-        toast.error("This email is already in use. Sign in instead?");
+      router.refresh();
 
+      if (origin) {
+        router.push(`/${origin}`);
         return;
       }
 
-      if (err instanceof ZodError) {
-        toast.error(err.issues[0].message);
-
+      if (isSeller) {
+        router.push("/sell");
         return;
       }
 
-      toast.error("Something went wrong. Please try again.");
+      router.push("/");
     },
-    onSuccess: ({ sentToEmail }) => {
-      toast.success(`Verification email sent to ${sentToEmail}.`);
-      router.push("/verify-email?to=" + sentToEmail);
+    onError: (err) => {
+      if (err.data?.code === "UNAUTHORIZED") {
+        toast.error("Invalid email or password.");
+      }
     },
   });
 
@@ -59,7 +73,9 @@ export default function page() {
         <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
           <div className="flex flex-col items-center space-y-2 text-center">
             <Icons.logo className="w-20 h-20" />
-            <h1 className="text-2xl font-bold">Create an account</h1>
+            <h1 className="text-2xl font-bold">
+              Sign in to your {isSeller ? "seller" : ""} account
+            </h1>
           </div>
           <div className="grid gap-6">
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -95,27 +111,56 @@ export default function page() {
                     </p>
                   )}
                 </div>
-
-                <Button type="submit" disabled={isSubmitting || isLoading}>
-                  {isLoading || isSubmitting ? (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isLoading ? (
                     <Loader className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    "Create account"
+                    "Sign in"
                   )}
                 </Button>
               </div>
             </form>
+            <Link
+              href="/sign-up"
+              className={buttonVariants({
+                variant: "link",
+                className: "gap-1.5",
+              })}
+            >
+              Don't have an account? Sign up
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <div className="relative">
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center"
+              >
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  or
+                </span>
+              </div>
+            </div>
+            {isSeller ? (
+              <Button
+                onClick={continueAsBuyer}
+                variant="secondary"
+                disabled={isLoading}
+              >
+                Continue as customer
+              </Button>
+            ) : (
+              <Button
+                onClick={continueAsSeller}
+                variant="secondary"
+                disabled={isLoading}
+              >
+                Continue as seller
+              </Button>
+            )}
           </div>
-          <Link
-            href="/sign-in"
-            className={buttonVariants({
-              variant: "link",
-              className: "gap-1.5",
-            })}
-          >
-            Already have an account? Sign in
-            <ArrowRight className="w-4 h-4" />
-          </Link>
         </div>
       </div>
     </>

@@ -4,9 +4,12 @@ import { Icons } from "./Icons";
 import NavItems from "./NavItems";
 import { buttonVariants } from "../ui/button";
 import Cart from "./Cart";
+import { getServerSideUser } from "@/lib/payloadUtils";
+import { cookies } from "next/headers";
 
-export default function Navbar() {
-  const user = null;
+export default async function Navbar() {
+  const nextCookies = cookies();
+  const { user } = await getServerSideUser(nextCookies);
   return (
     <div className="bg-white sticky z-50 top-0 inset-x-0 h-16">
       <header className="relative bg-white">
